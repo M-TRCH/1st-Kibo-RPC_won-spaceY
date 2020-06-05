@@ -13,6 +13,7 @@ import org.opencv.aruco.Aruco;
 import org.opencv.aruco.DetectorParameters;
 import org.opencv.aruco.Dictionary;
 import org.opencv.core.Mat;
+import org.opencv.imgproc.Imgproc;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +22,8 @@ import gov.nasa.arc.astrobee.Result;
 import gov.nasa.arc.astrobee.types.Point;
 import gov.nasa.arc.astrobee.types.Quaternion;
 import jp.jaxa.iss.kibo.rpc.api.KiboRpcService;
+
+// import org.opencv.core.Point;
 
 public class YourService extends KiboRpcService
 {
@@ -46,8 +49,8 @@ public class YourService extends KiboRpcService
 
 
 
-
-
+        circle_detect();
+        /*
         double pos_x = ((pos_ar[0]-640)/pos_ar[2])+10.95+0.0994-0.0572+0.1414+0.00;
         double pos_z = ((pos_ar[1]-480)/pos_ar[2])+5.410-0.0285+0.1111+0.1414+0.00;
         double pos_y = -9.590;
@@ -64,22 +67,22 @@ public class YourService extends KiboRpcService
         Log.d("[FINAL.POINT]\n","px : "+final_px+"\npy : "+final_py+"\npz : "+final_pz);
         Log.d("[FINAL.QUATERNION]\n","qx : "+final_qx+"\nqy : "+final_qy+"\nqz : "+final_qz+"\nqw : "+final_qw);
         Log.d("[AR.POSITION]\n","x : "+pos_ar[0]+"\ny : "+pos_ar[1]+"\nscale : "+pos_ar[2]);
+        */
+
 
         /*
         PointCloud Haz_Cam = api.getPointCloudHazCam();
         int height = Haz_Cam.getHeight();
         int wight = Haz_Cam.getWidth();
         Point[] final_point;
-
         final_point = Haz_Cam.getPointArray();
         double o = final_point[0].getZ();
-
         Log.d("Final_Point  1: ", Integer.toString(wight));
         Log.d("Final_Point  2: ", Integer.toString(height));
         Log.d("Final_Point  3: ", Double.toString(o));
         */
 
-        api.laserControl(true);
+        // api.laserControl(true);
         api.judgeSendFinishSimulation();
     }
     @Override
@@ -248,7 +251,7 @@ public class YourService extends KiboRpcService
                 };
 
         double x, y, z, i, j, k, p, q,
-               theta, a , b , c , w;
+                theta, a , b , c , w;
 
         x = (matrix[0][1]*matrix[1][2])-(matrix[1][1]*matrix[0][2]);
         y = (matrix[0][2]*matrix[1][0])-(matrix[1][2]*matrix[0][0]);
@@ -270,5 +273,42 @@ public class YourService extends KiboRpcService
         Quaternion final_qua = new Quaternion((float)a, (float)b, (float)c, (float)w);
 
         return final_qua;
+    }
+    public void circle_detect()
+    {
+        int x = 0;
+        while(x < 9)
+        {
+            moveTo(10.950f,-9.590f,5.410f,0.000f,0.000f, 0.707f,-0.707f);
+
+
+            Mat src = api.getMatNavCam();
+
+            Log.d("Circle detected:",""+src.type());
+
+            Mat circles = new Mat();
+            Mat gray = new Mat();
+            Mat blur = new Mat();
+
+//            Mat gray = new Mat(src.size(), CvType.CV_8UC1);
+//            Mat blur = new Mat(src.size(), CvType.CV_32F);
+
+            //Imgproc.cvtColor(src, gray, Imgproc.COLOR_BGR2GRAY);
+            //Imgproc.medianBlur(gray, blur, 1);
+
+            Imgproc.HoughCircles(src, circles, Imgproc.HOUGH_GRADIENT, 1.0, blur.rows()/8, 200, 100, 25, 150);
+
+
+
+            Log.d("Circle detected:",""+gray.cols()+"x"+gray.rows());
+
+            if(circles.cols() > 0)
+            {
+                api.laserControl(true);
+                Log.d("Circle detected:",""+circles.cols());
+                break;
+            }
+            x++;
+        }
     }
 }
