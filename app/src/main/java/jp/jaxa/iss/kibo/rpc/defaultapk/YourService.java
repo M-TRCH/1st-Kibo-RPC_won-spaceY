@@ -28,21 +28,19 @@ public class YourService extends KiboRpcService
     protected void runPlan1()
     {
         api.judgeSendStart();
-        api.getBitmapNavCam();api.getMatNavCam();
 
 
 
 
-        final double final_pz = moveTo(11.042f,-5.583f,4.360f,0.500f,0.500f,-0.500f, 0.500f,2);
-        final double final_px = moveTo(11.440f,-5.659f,4.583f,0.000f,0.000f, 0.000f, 1.000f,0);
-        final double final_py = moveTo(11.083f,-6.042f,5.440f,0.707f,0.000f, 0.707f, 0.000f,1);
-        /* bay_3:KOZ_2-KOZ_3 */ moveTo(10.500f,-6.450f,5.262f,0.000f,0.000f, 0.000f, 0.000f);
-        final double final_qy = moveTo(11.490f,-7.958f,5.083f,0.000f,0.000f, 0.000f, 1.000f,4);
-        final double final_qz = moveTo(11.083f,-7.742f,5.440f,0.707f,0.000f, 0.707f, 0.000f,5);
-        final double final_qx = moveTo(10.410f,-7.542f,4.783f,0.000f,0.000f, 1.000f, 0.000f,3);
-        final double final_qw = find_w(final_qx, final_qy, final_qz);
+        final double final_p1 = moveTo(11.440f,-5.659f,4.583f,0.000f,0.000f, 0.000f, 1.000f,0);
+        /* bay_3: P1 > KOZ_2 */ moveTo(10.500f,-6.450f,4.649f,0.000f,0.000f, 0.000f, 0.000f);
+        /* bay_3: KOZ_3 > P2 */ moveTo(11.490f,-7.958f,4.716f,0.000f,0.000f, 0.000f, 0.000f);
+        final double final_p2 = moveTo(10.410f,-7.542f,4.783f,0.000f,0.000f, 1.000f, 0.000f,3);
+
+
+        //final double final_qw = find_w(final_qx, final_qy, final_qz);
         final double[] pos_ar = moveTo(10.950f,-9.590f,5.410f,0.000f,0.000f, 0.707f,-0.707f,"");
-        targetShoot(pos_ar[0], pos_ar[1], pos_ar[2]);
+        // targetShoot(pos_ar[0], pos_ar[1], pos_ar[2]);
 
 
 
@@ -122,11 +120,12 @@ public class YourService extends KiboRpcService
         double avg[] = new double[5], center[] = new double[6], result[] = new double[3];
         float px_out = px, pz_out = pz;
 
-        while(AR_int == 0 && count < 8)
+        while(AR_int == 0 && count < 15)
         {
             Log.d("AR_counter: ", ""+count);
 
-            if(count > 3){ px_out = 10.70f; pz_out = 5.20f; }
+                 if(count > 10){ px_out = 10.95f; pz_out = 5.20f; }
+            else if(count >  5){ px_out = 10.70f; pz_out = 5.10f; }
 
             moveTo(px_out, py, pz_out, qx, qy, qz, qw);
 
@@ -147,7 +146,7 @@ public class YourService extends KiboRpcService
             }
             if(AR_int != 0)
             {
-                Log.d("AR["+ar+"]: ", ""+AR_int);
+                Log.d("AR["+count+"]: ", ""+AR_int);
                 x[0] = (int)corners.get(0).get(0, 0)[0]; // x ขวาบน
                 y[0] = (int)corners.get(0).get(0, 0)[1]; // y ขวาบน
                 x[1] = (int)corners.get(0).get(0, 1)[0]; // x ซ้ายบน
@@ -173,6 +172,7 @@ public class YourService extends KiboRpcService
                 result[1] = y[0]+center[5]; // y point > range 0-959
                 result[2] = avg[4]/0.05;    // ratio > pixel:meter
             }
+            count++;
         }
         String AR_value = Integer.toString(AR_int); api.judgeSendDiscoveredAR(AR_value);
         return result;
@@ -203,14 +203,55 @@ public class YourService extends KiboRpcService
         }
         return result;
     }
-    public void targetShoot(double x, double y, double d)
+    public void targetShoot(double px, double py, double d)
     {
-        double pos_x = ((x-640)/d)+10.95+0.0994-0.0572+0.1414;
-        double pos_z = ((y-480)/d)+5.410-0.0285+0.1111+0.1414;
+        double pos_x = ((px-640)/d)+10.95+0.1414;
+        double pos_z = ((py-480)/d)+5.410+0.1414;
         double pos_y = -9.590;
-        pos_x = limit('x', pos_x);
-        pos_y = limit('y', pos_y);
-        pos_z = limit('z', pos_z);
-        moveTo((float)pos_x, (float)pos_y, (float)pos_z,0.000f,0.000f,0.707f,-0.707f);
+
+        double pos_a = 10.95 ;
+        double pos_b = -9.59 ;
+        double pos_c =  5.41;
+
+//        double pos_x = ((x-640)/d)+10.95+0.0994-0.0572+0.1414;
+//        double pos_z = ((y-480)/d)+5.410-0.0285+0.1111+0.1414;
+
+        double magnitude = Math.sqrt(((pos_x-pos_a)*(pos_x-pos_a)) + ((pos_y-pos_b)*(pos_y-pos_b)) + ((pos_z-pos_c)*(pos_z-pos_c))) ;
+
+        double x_unit = (pos_x - pos_a) / magnitude ;
+        double y_unit = (pos_y - pos_b) / magnitude ;
+        double z_unit = (pos_z - pos_c) / magnitude ;
+
+        double matrix[][] =
+                {
+                        { 1 , 0 , 0 },
+                        {x_unit, y_unit, z_unit }
+                };
+
+        double x = (matrix[0][1]*matrix[1][2])-(matrix[1][1]*matrix[0][2]);
+        double y = (matrix[0][2]*matrix[1][0])-(matrix[1][2]*matrix[0][0]);
+        double z = (matrix[0][0]*matrix[1][1])-(matrix[1][0]*matrix[0][1]);
+
+        double i = matrix[1][0]-matrix[0][0];
+        double j = matrix[1][1]-matrix[0][1];
+        double k = matrix[1][2]-matrix[0][2];
+
+        double q = Math.sqrt(x*x + y*y +z*z);
+        double p = Math.sqrt(i*i + j*j + k*k);
+        double r = Math.sqrt(matrix[0][0]*matrix[0][0] + matrix[0][1]*matrix[0][1] + matrix[0][2]*matrix[0][2]);
+
+        double theta = Math.acos(((p*p)-2)/2*q*r*(-1));
+
+        double a = Math.sin(theta/2)*x ;
+        double b = Math.sin(theta/2)*y ;
+        double c = Math.sin(theta/2)*z ;
+        double w = (Math.cos(theta/2));
+
+        moveTo((float)pos_a, (float)pos_b, (float)pos_c, 0.0f, 0.0f, 0.0f, 1.0f);
+        moveTo((float)pos_a, (float)pos_b, (float)pos_c, (float)a, (float)b, (float)c, (float)w);
+
     }
+
 }
+
+
