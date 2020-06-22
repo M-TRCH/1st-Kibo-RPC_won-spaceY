@@ -17,6 +17,7 @@ import org.opencv.core.Mat;
 import java.util.ArrayList;
 import java.util.List;
 
+import gov.nasa.arc.astrobee.Kinematics;
 import gov.nasa.arc.astrobee.Result;
 import gov.nasa.arc.astrobee.types.Point;
 import gov.nasa.arc.astrobee.types.Quaternion;
@@ -36,12 +37,9 @@ public class YourService extends KiboRpcService
         /* bay_3: P1 > KOZ_2 */ moveTo(10.500f,-6.450f,4.649f,0.000f,0.000f, 0.000f, 0.000f);
         /* bay_3: KOZ_3 > P2 */ moveTo(11.490f,-7.958f,4.716f,0.000f,0.000f, 0.000f, 0.000f);
         final double final_p2 = moveTo(10.410f,-7.542f,4.783f,0.000f,0.000f, 1.000f, 0.000f,3);
-
-
-        //final double final_qw = find_w(final_qx, final_qy, final_qz);
         final double[] pos_ar = moveTo(10.950f,-9.590f,5.410f,0.000f,0.000f, 0.707f,-0.707f,"");
-        // targetShoot(pos_ar[0], pos_ar[1], pos_ar[2]);
 
+        targetShoot(pos_ar[0], pos_ar[1], pos_ar[2], pos_ar[3], pos_ar[4], pos_ar[5]);
 
 
 
@@ -71,12 +69,14 @@ public class YourService extends KiboRpcService
         Point point = new Point(px, py, pz);
         Quaternion quaternion = new Quaternion(qx, qy, qz, qw);
 
-        Result result = api.moveTo(point, quaternion, true);
+        moveTo(point, quaternion);
+    }
+    public void moveTo(double px, double py, double pz, double qx, double qy, double qz, double qw, char c)
+    {
+        Point point = new Point((float)px, (float)py, (float)pz);
+        Quaternion quaternion = new Quaternion((float)qx, (float)qy, (float)qz, (float)qw);
 
-        while (!result.hasSucceeded())
-        {
-            result = api.moveTo(point, quaternion, true);
-        }
+        api.moveTo(point, quaternion, false);
     }
     public double moveTo(float px, float py, float pz, float qx, float qy, float qz, float qw, int no)
     {
@@ -100,6 +100,7 @@ public class YourService extends KiboRpcService
             reader.setConfig(Symbol.QRCODE, Config.ENABLE, 1);
             reader.scanImage(barcode.convert("Y800"));
 
+
             SymbolSet syms = reader.getResults();
             for (Symbol sym : syms)
             {
@@ -117,15 +118,16 @@ public class YourService extends KiboRpcService
     {
         int AR_int = 0, count = 0;
         int x[] = new int[4], y[] = new int[4];
-        double avg[] = new double[5], center[] = new double[6], result[] = new double[3];
+        double avg[] = new double[5], center[] = new double[6], result[] = new double[6];
         float px_out = px, pz_out = pz;
+        Point point = new Point();
 
         while(AR_int == 0 && count < 15)
         {
             Log.d("AR_counter: ", ""+count);
 
-                 if(count > 10){ px_out = 10.95f; pz_out = 5.20f; }
-            else if(count >  5){ px_out = 10.70f; pz_out = 5.10f; }
+//                 if(count > 10){ px_out = 10.95f; pz_out = 5.20f; }
+//            else if(count >  5){ px_out = 10.70f; pz_out = 5.10f; }
 
             moveTo(px_out, py, pz_out, qx, qy, qz, qw);
 
@@ -139,6 +141,8 @@ public class YourService extends KiboRpcService
             {
                 Aruco.detectMarkers(source, dictionary, corners, ids);
                 AR_int = (int)ids.get(0, 0)[0];
+                Kinematics current = api.getTrustedRobotKinematics();
+                point = current.getPosition();
             }
             catch (Exception e)
             {
@@ -175,6 +179,9 @@ public class YourService extends KiboRpcService
             count++;
         }
         String AR_value = Integer.toString(AR_int); api.judgeSendDiscoveredAR(AR_value);
+        result[3] = point.getX();
+        result[4] = point.getY();
+        result[5] = point.getZ();
         return result;
     }
     public double find_w(double qx,double qy,double qz)
@@ -203,55 +210,57 @@ public class YourService extends KiboRpcService
         }
         return result;
     }
-    public void targetShoot(double px, double py, double d)
+    public void targetShoot(double px, double py, double d, double pos_a, double pos_b, double pos_c)
     {
-        double pos_x = ((px-640)/d)+10.95+0.1414;
-        double pos_z = ((py-480)/d)+5.410+0.1414;
-        double pos_y = -9.590;
+        double navShift_z   = 0.0826;
+        double navShift_x   = 0.0422;
+        double targetShift  = 0.1414;
+        double laserShift_x = 0.0572;
+        double laserShift_z = 0.1111;
 
-        double pos_a = 10.95 ;
-        double pos_b = -9.59 ;
-        double pos_c =  5.41;
+        double pos_x = ((px-640)/d)+pos_a+targetShift+navShift_x-laserShift_x;
+        double pos_z = ((py-480)/d)+pos_c+targetShift+navShift_z+laserShift_z;
+        double pos_y = -10.35;
 
-//        double pos_x = ((x-640)/d)+10.95+0.0994-0.0572+0.1414;
-//        double pos_z = ((y-480)/d)+5.410-0.0285+0.1111+0.1414;
 
-        double magnitude = Math.sqrt(((pos_x-pos_a)*(pos_x-pos_a)) + ((pos_y-pos_b)*(pos_y-pos_b)) + ((pos_z-pos_c)*(pos_z-pos_c))) ;
+//        double offet_magnitude = Math.sqrt(0.1302*0.1302+0.572*0.572+0.111*0.111);
+//        double x_offset =  0.1302/offet_magnitude;
+//        double y_offset = -0.0572/offet_magnitude;
+//        double z_offset = -0.1110/offet_magnitude;
 
-        double x_unit = (pos_x - pos_a) / magnitude ;
-        double y_unit = (pos_y - pos_b) / magnitude ;
-        double z_unit = (pos_z - pos_c) / magnitude ;
+        double magnitude = Math.sqrt(((pos_x-pos_a)*(pos_x-pos_a))
+                                    +((pos_y-pos_b)*(pos_y-pos_b))
+                                    +((pos_z-pos_c)*(pos_z-pos_c)));
+
+        double x_unit = (pos_x - pos_a)/magnitude;
+        double y_unit = (pos_y - pos_b)/magnitude;
+        double z_unit = (pos_z - pos_c)/magnitude;
 
         double matrix[][] =
                 {
-                        { 1 , 0 , 0 },
+                        {1, 0, 0},
                         {x_unit, y_unit, z_unit }
                 };
 
-        double x = (matrix[0][1]*matrix[1][2])-(matrix[1][1]*matrix[0][2]);
-        double y = (matrix[0][2]*matrix[1][0])-(matrix[1][2]*matrix[0][0]);
-        double z = (matrix[0][0]*matrix[1][1])-(matrix[1][0]*matrix[0][1]);
+        double x = matrix[0][1]*matrix[1][2]-matrix[1][1]*matrix[0][2];
+        double y = matrix[0][2]*matrix[1][0]-matrix[1][2]*matrix[0][0];
+        double z = matrix[0][0]*matrix[1][1]-matrix[1][0]*matrix[0][1];
 
         double i = matrix[1][0]-matrix[0][0];
         double j = matrix[1][1]-matrix[0][1];
         double k = matrix[1][2]-matrix[0][2];
 
-        double q = Math.sqrt(x*x + y*y +z*z);
+        double q = Math.sqrt(x*x + y*y + z*z);
         double p = Math.sqrt(i*i + j*j + k*k);
         double r = Math.sqrt(matrix[0][0]*matrix[0][0] + matrix[0][1]*matrix[0][1] + matrix[0][2]*matrix[0][2]);
 
-        double theta = Math.acos(((p*p)-2)/2*q*r*(-1));
+        double theta = Math.acos((p*p-2)/2*q*r*(-1));
 
-        double a = Math.sin(theta/2)*x ;
-        double b = Math.sin(theta/2)*y ;
-        double c = Math.sin(theta/2)*z ;
-        double w = (Math.cos(theta/2));
+        double a = Math.sin(theta/2)*x/q;
+        double b = Math.sin(theta/2)*y/q;
+        double c = Math.sin(theta/2)*z/q;
+        double w = Math.cos(theta/2);
 
-        moveTo((float)pos_a, (float)pos_b, (float)pos_c, 0.0f, 0.0f, 0.0f, 1.0f);
         moveTo((float)pos_a, (float)pos_b, (float)pos_c, (float)a, (float)b, (float)c, (float)w);
-
     }
-
 }
-
-
