@@ -25,6 +25,8 @@ import gov.nasa.arc.astrobee.types.Point;
 import gov.nasa.arc.astrobee.types.Quaternion;
 import jp.jaxa.iss.kibo.rpc.api.KiboRpcService;
 
+import static org.opencv.android.Utils.matToBitmap;
+
 public class YourService extends KiboRpcService
 {
     @Override
@@ -32,18 +34,23 @@ public class YourService extends KiboRpcService
     {
         api.judgeSendStart();
 
-
-        final double final_p1 = moveTo(11.440f, -5.659f, 4.583f, 0.000f, 0.000f, 0.000f, 1.000f, 0);
+                                moveTo(10.9263f, -5.2426f, 4.4622f, 0.0f, 0.0f, 0.0f, 0.0f);
+        final double final_p1 = moveTo(10.7600f, -5.2426f, 4.4622f, 0.0f, 0.0f, 1.0f, 0.0f, 0);
         /* bay_3: P1 > KOZ_2 */
-        moveTo(10.500f, -6.450f, 4.649f, 0.000f, 0.000f, 0.000f, 0.000f);
-        /* bay_3: KOZ_3 > P2 */
-        moveTo(11.490f, -7.958f, 4.716f, 0.000f, 0.000f, 0.000f, 0.000f);
-        final double final_p2 = moveTo(10.410f, -7.542f, 4.783f, 0.000f, 0.000f, 1.000f, 0.000f, 3);
-        final double[] pos_ar = moveTo(10.950f, -9.590f, 5.410f, 0.000f, 0.000f, 0.707f, -0.707f, "");
+//        moveTo(10.500f, -6.450f, 4.649f, 0.000f, 0.000f, 0.000f, 0.000f);
+//        /* bay_3: KOZ_3 > P2 */
+//        moveTo(11.490f, -7.958f, 4.716f, 0.000f, 0.000f, 0.000f, 0.000f);
+//        final double final_p2 = moveTo(10.410f, -7.542f, 4.783f, 0.000f, 0.000f, 1.000f, 0.000f, 3);
+//        final double[] pos_ar = moveTo(10.950f, -9.590f, 5.410f, 0.000f, 0.000f, 0.707f, -0.707f, "");
+//
+//        targetShoot(pos_ar[0], pos_ar[1], pos_ar[2], pos_ar[3], pos_ar[4], pos_ar[5]);
 
-        targetShoot(pos_ar[0], pos_ar[1], pos_ar[2], pos_ar[3], pos_ar[4], pos_ar[5]);
+//        Mat source = api.getMatNavCam();
+//        Bitmap src;
+//
+//        CreateBitmap(src, 0.0, 0, 1280, 960, source, false);
 
-        api.laserControl(true);
+        api.laserControl(false);
         api.judgeSendFinishSimulation();
     }
 
@@ -80,13 +87,25 @@ public class YourService extends KiboRpcService
     public double moveTo(float px, float py, float pz, float qx, float qy, float qz, float qw, int no)
     {
         String contents = null;
-        int count = 0, count_max = 3;
+        int count = 0, count_max = 100;
         Point point = new Point(px, py, pz);
         Quaternion quaternion = new Quaternion(qx, qy, qz, qw);
 
-        while (contents == null && count < count_max) {
+        while (contents == null && count < count_max)
+        {
+            Log.d("QR[Count]:"," ["+count+"]");
             moveTo(point, quaternion);
-            Bitmap source = api.getBitmapNavCam();
+
+            // NEW //
+            Mat mat_src = api.getMatNavCam();
+
+            mat_src = undistord(mat_src);
+            Bitmap source;
+            source = Bitmap.createBitmap(1280, 960, Bitmap.Config.ARGB_8888);
+            matToBitmap(mat_src, source, false);
+            //     //
+
+            // Bitmap source = api.getBitmapNavCam();
 
             int[] pixel = new int[source.getWidth() * source.getHeight()];
             source.getPixels(pixel, 0, source.getWidth(), 0, 0, source.getWidth(), source.getHeight());
@@ -100,15 +119,18 @@ public class YourService extends KiboRpcService
 
 
             SymbolSet syms = reader.getResults();
-            for (Symbol sym : syms) {
+            for (Symbol sym : syms)
+            {
                 contents = sym.getData();
                 Log.d("QR[" + no + "]: ", contents);
             }
             count++;
         }
         String[] val_array = contents.split(", ");
-        double val_return = Double.parseDouble(val_array[1]);
-        api.judgeSendDiscoveredQR(no, contents);
+        double val_return = 0; //Double.parseDouble(val_array[1]);
+        api.judgeSendDiscoveredQR(0, "pos_x, "+val_array[1]);
+        api.judgeSendDiscoveredQR(1, "pos_y, "+val_array[3]);
+        api.judgeSendDiscoveredQR(2, "pos_z, "+val_array[5]);
         return val_return;
     }
     public double[] moveTo(float px, float py, float pz, float qx, float qy, float qz, float qw, String ar)
@@ -125,7 +147,8 @@ public class YourService extends KiboRpcService
 
             moveTo(px_out, py, pz_out, qx, qy, qz, qw);
 
-            Mat source = undistord(api.getMatNavCam());
+            //Mat source = undistord(api.getMatNavCam());
+            Mat source = api.getMatNavCam();
             Mat ids = new Mat();
             Dictionary dictionary = Aruco.getPredefinedDictionary(Aruco.DICT_5X5_250);
             List<Mat> corners = new ArrayList<>();
@@ -168,8 +191,9 @@ public class YourService extends KiboRpcService
 
                 result[0] = x[0] - center[4]; // x point > range 0-1279
                 result[1] = y[0] + center[5]; // y point > range 0-959
+                result[2] = avg[4]/0.05;    // ratio > pixel:meter
                 Log.d("AR_center[OLD]: ",result[0]+", "+result[1]);
-                result[2] = avg[4] / 0.05;    // ratio > pixel:meter
+                Log.d("AR_center[OLD]:"," "+result[2]);
 
                 double p[][] =
                 {
@@ -179,8 +203,9 @@ public class YourService extends KiboRpcService
                     {x[3], y[3]}
                 };
                 double[] c = interceptLine(p);
-                result[0] = c[0];
-                result[1] = c[1];
+//                result[0] = c[0];
+//                result[1] = c[1];
+//                result[2] = c[2];
             }
             count++;
         }
@@ -201,35 +226,26 @@ public class YourService extends KiboRpcService
     {
         double result = val;
 
-        if (axis == 'x') {
-            if (result > 11.49) {
-                result = 11.49;
-            }
-            if (result < 10.41) {
-                result = 10.41;
-            }
+        if (axis == 'x')
+        {
+            if (result > 11.49){ result = 11.49; }
+            if (result < 10.41){ result = 10.41; }
         }
-        if (axis == 'y') {
-            if (result > -3.16) {
-                result = -3.16;
-            }
-            if (result < -9.59) {
-                result = -9.59;
-            }
+        if (axis == 'y')
+        {
+            if (result > -3.16) { result = -3.16; }
+            if (result < -9.59) { result = -9.59; }
         }
-        if (axis == 'z') {
-            if (result > 5.44) {
-                result = 5.44;
-            }
-            if (result < 4.36) {
-                result = 4.36;
-            }
+        if (axis == 'z')
+        {
+            if (result > 5.44) { result = 5.44; }
+            if (result < 4.36) { result = 4.36; }
         }
         return result;
     }
     public void targetShoot(double px, double py, double d, double pos_a, double pos_b, double pos_c)
     {
-        double targetShift = 0.1414;
+        double targetShift = 0.2*Math.sin(Math.toRadians(45));
         double navShift_z = 0.0826;
         double navShift_x = 0.0422;
         double laserShift_x = 0.0572;
@@ -263,14 +279,14 @@ public class YourService extends KiboRpcService
 
         double q = Math.sqrt(x * x + y * y + z * z);
         double p = Math.sqrt(i * i + j * j + k * k);
-        double r = Math.sqrt(matrix[0][0] * matrix[0][0] + matrix[0][1] * matrix[0][1] + matrix[0][2] * matrix[0][2]);
+        double r = Math.sqrt(matrix[0][0]*matrix[0][0]+matrix[0][1]*matrix[0][1]+matrix[0][2]*matrix[0][2]);
 
-        double theta = Math.acos((p * p - 2) / 2 * q * r * (-1));
+        double theta = Math.acos((p*p-2)/2*q*r*(-1));
 
-        double a = Math.sin(theta / 2) * x / q;
-        double b = Math.sin(theta / 2) * y / q;
-        double c = Math.sin(theta / 2) * z / q;
-        double w = Math.cos(theta / 2);
+        double a = Math.sin(theta/2)*x/q;
+        double b = Math.sin(theta/2)*y/q;
+        double c = Math.sin(theta/2)*z/q;
+        double w = Math.cos(theta/2);
 
         moveTo((float) pos_a, (float) pos_b, (float) pos_c, (float) a, (float) b, (float) c, (float) w);
     }
@@ -297,7 +313,7 @@ public class YourService extends KiboRpcService
     }
     public  double[] interceptLine(double p[][])
     {
-        double center[] = new double[2];
+        double center[] = new double[3];
 
         double a = (p[1][0]-p[0][0])*(p[3][0]-p[2][0]);
         double b = (p[1][0]-p[0][0])*(p[3][1]-p[2][1]);
@@ -306,7 +322,18 @@ public class YourService extends KiboRpcService
         center[0] = (a*p[0][1]+b*p[2][0]-a*p[2][1]-c*p[0][0])/(b-c);
         center[1] = ((p[1][1]-p[0][1])*(center[0]-p[0][0])/(p[1][0]-p[0][0]))+p[0][1];
 
+        double x_l1 = Math.pow(p[0][0]-p[1][0], 2);
+        double y_l1 = Math.pow(p[0][1]-p[1][1], 2);
+        double x_l2 = Math.pow(p[2][0]-p[2][0], 2);
+        double y_l2 = Math.pow(p[3][1]-p[3][1], 2);
+
+        double avg = (Math.sqrt(x_l1+y_l1)+Math.sqrt(x_l2+y_l2))/2;
+
+        center[2] = avg/0.07071067812;
+
         Log.d("AR_center[NEW]: ",center[0]+", "+center[1]);
+        Log.d("AR_center[NEW]:",""+center[2]);
+
         return  center;
     }
 }
