@@ -1,6 +1,7 @@
 package jp.jaxa.iss.kibo.rpc.defaultapk;
 
 import android.graphics.Bitmap;
+import android.os.SystemClock;
 import android.util.Log;
 
 
@@ -23,6 +24,7 @@ import org.opencv.aruco.DetectorParameters;
 import org.opencv.aruco.Dictionary;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.core.Rect;
 
@@ -43,8 +45,12 @@ public class YourService extends KiboRpcService
     @Override
     protected void runPlan1()
     {
-        api.judgeSendStart();
-
+        for(int i=0; i<3; i++)
+        {
+            api.judgeSendStart();
+            Log.d("[API("+i+")]:" , "Judge send start");
+            SystemClock.sleep(5000);
+        }
 
 
 
@@ -80,6 +86,8 @@ public class YourService extends KiboRpcService
 
 
             Mat src_mat = api.getMatNavCam();
+            Size size = new Size(4000,3000);
+            Imgproc.resize(src_mat, src_mat, size);
 
 
             src_mat = undistord(src_mat);
@@ -103,8 +111,7 @@ public class YourService extends KiboRpcService
             Mat crop = new Mat(src_mat, rect);
 */
 
-
-            Bitmap bMap = Bitmap.createBitmap(1280, 960, Bitmap.Config.ARGB_8888);
+            Bitmap bMap = Bitmap.createBitmap(4000, 3000, Bitmap.Config.ARGB_8888);
             matToBitmap(src_mat, bMap, false);
 
 
