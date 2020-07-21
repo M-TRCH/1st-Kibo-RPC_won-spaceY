@@ -10,7 +10,6 @@ import com.google.zxing.LuminanceSource;
 import com.google.zxing.RGBLuminanceSource;
 import com.google.zxing.common.HybridBinarizer;
 import com.google.zxing.qrcode.QRCodeReader;
-import com.google.zxing.qrcode.detector.Detector;
 
 
 import net.sourceforge.zbar.Config;
@@ -55,19 +54,15 @@ public class YourService extends KiboRpcService
 
 
 
-//        moveTo(10.9263f, -5.2426f, 4.4622f, 0.0f, 0.0f, 0.0f, 0.0f);
-//        moveTo(10.7600f, -5.2426f, 4.4622f, 0.0f, 0.0f, 1.0f, 0.0f);
 
-        moveTo(10.4600f, -4.5000f, 5.2400f, 0.000f,  0.000f, 0.000f, 0.000f);
-        moveTo(10.4600f, -7.6800f, 5.2400f, 0.000f,  0.000f, 0.000f, 0.000f);
-
-
+        moveTo(10.9263f, -5.2426f, 4.4622f, 0.0f, 0.0f, 0.0f, 0.0f); //p1
 
         String contents = null;
         int count = 0;
         while(contents == null)
         {
-            moveTo(10.9774f, -7.6378f, 5.4000f, 0.000f, -0.707f, 0.000f, 0.707f);
+
+            moveTo(10.7600f, -5.2426f, 4.4622f, 0.0f, 0.0f, 1.0f, 0.0f); //p1
 
             Kinematics current = api.getTrustedRobotKinematics();
             Point pos = current.getPosition();
@@ -82,20 +77,11 @@ public class YourService extends KiboRpcService
 
             Log.d("Current_Position["+count+"]:", " "+px+", "+py+", "+pz+", "+qx+", "+qy+", "+qz+", "+qw);
 
-
-
-
-
             Mat src_mat = api.getMatNavCam();
             src_mat = undistord(src_mat);
 
-
-
-
-
-
-            double ratio = 1280/960;
-            double percent_row = 25;
+            double ratio = 1280.0/960.0;
+            double percent_row = 20;
             double percent_col = percent_row*ratio;
             int max_row = 960;
             int max_col = 1280;
@@ -121,10 +107,8 @@ public class YourService extends KiboRpcService
             Log.d("QR[crop]:"," "+bMap.getWidth()+", "+bMap.getHeight());
 
 
-//            Bitmap bMap = api.getBitmapNavCam();
 
-
-
+            Log.d("QR[status]:", " start");
 
             int[] intArray = new int[bMap.getWidth() * bMap.getHeight()];
             bMap.getPixels(intArray, 0, bMap.getWidth(), 0, 0, bMap.getWidth(), bMap.getHeight());
@@ -134,8 +118,6 @@ public class YourService extends KiboRpcService
 
             try
             {
-                // com.google.zxing.qrcode.detector.Detector result = new Detector(bitmap);
-
                 com.google.zxing.Result result = new QRCodeReader().decode(bitmap);
                 contents = result.getText();
                 Log.d("QR[value]:", " "+contents);
@@ -144,15 +126,12 @@ public class YourService extends KiboRpcService
             {
                 Log.d("QR[status]:", " Not detected");
             }
-
-
-
-
-
             Log.d("QR[count]:", " "+count);
+            Log.d("QR[status]:", " stop");
+
             count++;
         }
-        api.judgeSendDiscoveredQR(1, contents);
+        api.judgeSendDiscoveredQR(0, contents);
 
         String[] multi_contents = contents.split(", ");
         Log.d("QR[x]:"," "+multi_contents[1]);
@@ -162,11 +141,106 @@ public class YourService extends KiboRpcService
 
 
 
-        moveTo(10.9774f, -7.6378f, 5.4000f, 0.0000f, 0.0000f, 0.7071f, -0.7071f);
+        moveTo(10.7600f, -5.7100f, 4.9100f, 0.0f, 0.0f, 0.7071f, -0.7071f);
+        moveTo(10.4600f, -6.0800f, 5.2400f, 0.0f, 0.0f, 0.7071f, -0.7071f);
+        moveTo(10.4600f, -7.6800f, 5.2400f, 0.0f, 0.0f, 0.0f, 0.0f);
 
-        
 
 
+
+        contents = null;
+        count = 0;
+        while(contents == null)
+        {
+            moveTo(10.9774f, -7.6378f, 5.4000f, 0.0f, -0.7071f, 0.0f, 0.7071f); //p2
+
+            Kinematics current = api.getTrustedRobotKinematics();
+            Point pos = current.getPosition();
+            Quaternion qua = current.getOrientation();
+            double px = pos.getX();
+            double py = pos.getY();
+            double pz = pos.getZ();
+            double qx = qua.getX();
+            double qy = qua.getY();
+            double qz = qua.getZ();
+            double qw = find_w(qx, qy, qz);
+
+            Log.d("Current_Position["+count+"]:", " "+px+", "+py+", "+pz+", "+qx+", "+qy+", "+qz+", "+qw);
+
+            Mat src_mat = api.getMatNavCam();
+            src_mat = undistord(src_mat);
+
+            double ratio = 1280.0/960.0;
+            double percent_row = 20;
+            double percent_col = percent_row*ratio;
+            int max_row = 960;
+            int max_col = 1280;
+            int offset_row = ((int)percent_row*max_row)/100;
+            int offset_col = ((int)percent_col*max_col)/100;
+            double rows = max_row-(offset_row*2);
+            double cols = max_col-(offset_col*2);
+
+
+
+            Rect rect = new Rect(offset_col, offset_row , (int)cols, (int)rows);
+            Mat crop = new Mat(src_mat, rect);
+
+
+            Size size = new Size(2000,1500);
+            Imgproc.resize(crop, crop, size);
+
+
+
+
+            Bitmap bMap = Bitmap.createBitmap(2000, 1500, Bitmap.Config.ARGB_8888);
+            matToBitmap(crop, bMap, false);
+            Log.d("QR[crop]:"," "+bMap.getWidth()+", "+bMap.getHeight());
+
+
+
+            Log.d("QR[status]:", " start");
+
+            int[] intArray = new int[bMap.getWidth() * bMap.getHeight()];
+            bMap.getPixels(intArray, 0, bMap.getWidth(), 0, 0, bMap.getWidth(), bMap.getHeight());
+
+            LuminanceSource source = new RGBLuminanceSource(bMap.getWidth(), bMap.getHeight(), intArray);
+            BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
+
+            try
+            {
+                com.google.zxing.Result result = new QRCodeReader().decode(bitmap);
+                contents = result.getText();
+                Log.d("QR[value]:", " "+contents);
+            }
+            catch (Exception e)
+            {
+                Log.d("QR[status]:", " Not detected");
+            }
+
+            Log.d("QR[count]:", " "+count);
+            Log.d("QR[status]:", " stop");
+
+            count++;
+        }
+        api.judgeSendDiscoveredQR(1, contents);
+
+        multi_contents = contents.split(", ");
+        Log.d("QR[x]:"," "+multi_contents[1]);
+        Log.d("QR[y]:"," "+multi_contents[3]);
+        Log.d("QR[z]:"," "+multi_contents[5]);
+
+
+
+
+
+
+
+
+
+
+
+        moveTo(10.8000f, -8.5000f, 5.1500f, 0.0f, 0.0f, 0.7071f, -0.7071f);
+        final double[] pos_ar = moveTo(10.950f,-9.590f,5.410f,0.000f,0.000f, 0.707f,-0.707f,"");
 
 
 
@@ -195,7 +269,7 @@ public class YourService extends KiboRpcService
 
     public void moveTo(Point point, Quaternion quaternion)
     {
-        int count = 0, count_max = 8;
+        int count = 0, count_max = 2;
         while (true)
         {
             Result result = api.moveTo(point, quaternion, true);
@@ -279,8 +353,8 @@ public class YourService extends KiboRpcService
 
             moveTo(px_out, py, pz_out, qx, qy, qz, qw);
 
-            //Mat source = undistord(api.getMatNavCam());
-            Mat source = api.getMatNavCam();
+            Mat source = undistord(api.getMatNavCam());
+            //Mat source = api.getMatNavCam();
             Mat ids = new Mat();
             Dictionary dictionary = Aruco.getPredefinedDictionary(Aruco.DICT_5X5_250);
             List<Mat> corners = new ArrayList<>();
