@@ -43,75 +43,46 @@ public class YourService extends KiboRpcService
 
         moveTo(10.9263f, -5.2426f, 4.4622f, 0.0f, 0.0f, 0.0f, 0.0f);
 
+        boolean run = true;
+        Mat src_mat = new Mat(1280,960, CvType.CV_8UC1);
 
-
-
-        int count = 0;
-
-        while(count < 3)
+        while(run)
         {
             moveTo(10.7600f, -5.2426f, 4.4622f, 0.0f, 0.0f, 1.0f, 0.0f); // p1
 
+            src_mat = api.getMatNavCam();
+            src_mat = undistord(src_mat);
+            Rect crop = qr_detect(src_mat);
 
-            Log.e("Rect[]:", " start_1");
-
-            Mat src = undistord(api.getMatNavCam());
-            Mat src_convert = new Mat(src.size(), CvType.CV_8UC3);
-            Mat src_blur = new Mat(src.size(), CvType.CV_8UC3);
-            Mat src_out = new Mat(src.size(), CvType.CV_8UC3);
-
-            Log.e("Rect[]:", " start_2.1");
-
-            Imgproc.cvtColor(src, src_convert, Imgproc.COLOR_GRAY2BGR);
-            Imgproc.cvtColor(src_convert, src_convert, Imgproc.COLOR_BGR2GRAY);
-
-
-
-
-            Log.e("Rect[]:", " start_2.2");
-
-            Imgproc.GaussianBlur(src_convert, src_blur, new Size(5, 5), 0);
-
-            Log.e("Rect[]:", " start_2.3");
-
-            Imgproc.adaptiveThreshold(src_blur, src_out, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY, 21, 1);
-
-            Log.e("Rect[]:", " start_2.4");
-
-            List<MatOfPoint> contours = new ArrayList<>();
-
-
-            try
+            if(crop.x != 0 && crop.y != 0 && crop.width != 1280 && crop.height != 960)
             {
-                Imgproc.findContours(src_out, contours, new Mat(), Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
-
-
-                Log.e("Rect[]:", " start_4");
-
-                for (int i = 0; i < contours.size(); i++)
-                {
-                    Log.e("Rect[]:", " start_5");
-                    if ((Imgproc.contourArea(contours.get(i)) > 500 && Imgproc.contourArea(contours.get(i)) < 8000))
-                    {
-                        Log.e("Rect[]:", " start_6");
-
-                        Rect rect = Imgproc.boundingRect(contours.get(i));
-                        if ((rect.height > 10 && rect.height < 300) && (rect.width > 10 && rect.width < 300))
-                        {
-                            Log.d("Rect[" + i + "]:", "" + rect.x + ", " + rect.y);
-                            Log.d("Rect[" + i + "]:", "" + rect.width + ", " + rect.height);
-                        }
-                    }
-                }
+                src_mat = new Mat(src_mat, crop);
+                run = false;
             }
-            catch (Exception e)
-            {
-                Log.e("Rect[]:", " error");
-            }
-            Log.d("Rect[count]:"," "+count);
-            count++;
         }
 
+        int width  = src_mat.width()/2;
+        int height = src_mat.height()/2;
+
+        Size size = new Size(width, height);
+//        Imgproc.resize(src_mat, src_mat, size);
+
+        int count=1;
+        for(int i=0; i<src_mat.height(); i++)
+        {
+            for (int j = 0; j < src_mat.width(); j++)
+            {
+                double[] val = src_mat.get(i, j);
+
+                Log.d("Mat["+i+", "+j+"]: ",""+val[0]);
+                SystemClock.sleep(1);
+            }
+            if (i > 20*count)
+            {
+                moveTo(10.7600f, -5.2426f, 4.4622f, 0.0f, 0.0f, 1.0f, 0.0f);
+                count++;
+            }
+        }
 
 
 
@@ -119,24 +90,29 @@ public class YourService extends KiboRpcService
         api.laserControl(true);
         api.judgeSendFinishSimulation();
     }
+
     @Override
     protected void runPlan2()
     {
 
     }
+
     @Override
     protected void runPlan3()
     {
 
     }
+
     public void moveTo(Point point, Quaternion quaternion)
     {
         Result result;
-        do {
+        do
+            {
             result = api.moveTo(point, quaternion, true);
         }
         while (!result.hasSucceeded());
     }
+
     public void moveTo(float px, float py, float pz, float qx, float qy, float qz, float qw)
     {
         Point point = new Point(px, py, pz);
@@ -144,39 +120,43 @@ public class YourService extends KiboRpcService
 
         moveTo(point, quaternion);
     }
+
     public double[] moveTo(float px, float py, float pz, float qx, float qy, float qz, float qw, int no)
     {
         String contents = null;
-        int count = 0, count_max = 10;
+        int count = 0, count_max = 5;
         Point point = new Point(px, py, pz);
         Quaternion quaternion = new Quaternion(qx, qy, qz, qw);
 
         while (contents == null && count < count_max)
         {
             moveTo(point, quaternion);
+            SystemClock.sleep(1000);
 
             Mat src_mat = api.getMatNavCam();
             src_mat = undistord(src_mat);
 
-            double ratio = 1280.0 / 960.0;
-            double percent_row = 20;
-            double percent_col = percent_row * ratio;
-            int max_row = 960;
-            int max_col = 1280;
-            int offset_row = ((int) percent_row * max_row) / 100;
-            int offset_col = ((int) percent_col * max_col) / 100;
-            double rows = max_row - (offset_row * 2);
-            double cols = max_col - (offset_col * 2);
+            double scale = 12;
+            int width = 1280, height = 960;
 
-            Rect rect = new Rect(offset_col, offset_row, (int) cols, (int) rows);
-            Mat crop = new Mat(src_mat, rect);
 
-            Size size = new Size(2000, 1500);
-            Imgproc.resize(crop, crop, size);
+            Rect crop = qr_detect(src_mat);
+            if(crop.x != 0 && crop.y != 0 && crop.width != 1280 && crop.height != 960)
+            {
+                src_mat = new Mat(src_mat, crop);
 
-            Bitmap bMap = Bitmap.createBitmap(2000, 1500, Bitmap.Config.ARGB_8888);
-            matToBitmap(crop, bMap, false);
+//                width  = (int)(scale*src_mat.width());
+//                height = (int)(scale*src_mat.height());
+//
+//                Size size = new Size(width, height);
+//                Imgproc.resize(src_mat, src_mat, size);
+            }
+
+            Bitmap bMap = Bitmap.createBitmap(src_mat.width(), src_mat.height(), Bitmap.Config.ARGB_8888);
+            matToBitmap(src_mat, bMap, false);
             Log.d("QR[crop]:", " " + bMap.getWidth() + ", " + bMap.getHeight());
+
+
 
             Log.d("QR[" + no + "][status]:", " start");
 
@@ -186,14 +166,16 @@ public class YourService extends KiboRpcService
             LuminanceSource source = new RGBLuminanceSource(bMap.getWidth(), bMap.getHeight(), intArray);
             BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
 
-            try {
+            try
+            {
                 com.google.zxing.Result result = new QRCodeReader().decode(bitmap);
                 contents = result.getText();
                 Log.d("QR[" + no + "][value]:", " " + contents);
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 Log.d("QR" + no + "[status]:", " Not detected");
             }
-
             Log.d("QR[" + no + "][count]:", " " + count);
             Log.d("QR[" + no + "][status]:", " stop");
 
@@ -214,14 +196,14 @@ public class YourService extends KiboRpcService
 
         return val_return;
     }
+
     public double[] moveTo(float px, float py, float pz, float qx, float qy, float qz, float qw, String ar)
     {
         int AR_int = 0, count = 0;
         double result[] = new double[6];
         Point point = new Point();
 
-        while (AR_int == 0)
-        {
+        while (AR_int == 0) {
             Log.d("AR_counter: ", "" + count);
 
             moveTo(px, py, pz, qx, qy, qz, qw);
@@ -233,18 +215,15 @@ public class YourService extends KiboRpcService
             List<Mat> corners = new ArrayList<>();
             DetectorParameters setting = null;
 
-            try
-            {
+            try {
                 Aruco.detectMarkers(source, dictionary, corners, ids);
                 AR_int = (int) ids.get(0, 0)[0];
                 Kinematics current = api.getTrustedRobotKinematics();
                 point = current.getPosition();
-            } catch (Exception e)
-            {
+            } catch (Exception e) {
                 AR_int = 0;
             }
-            if (AR_int != 0)
-            {
+            if (AR_int != 0) {
                 Log.d("AR[" + count + "]: ", "" + AR_int);
 
                 double[][] AR_corners =
@@ -269,49 +248,43 @@ public class YourService extends KiboRpcService
 
         return result;
     }
+
     public double find_w(double qx, double qy, double qz)
     {
         double qw = Math.sqrt(1 - qx * qx - qy * qy - qz * qz);
         return qw;
     }
-    public double limit(char axis, double val)
-    {
+
+    public double limit(char axis, double val) {
         double result = val;
 
         if (axis == 'x') {
-            if (result > 11.49)
-            {
+            if (result > 11.49) {
                 result = 11.49;
             }
-            if (result < 10.41)
-            {
+            if (result < 10.41) {
                 result = 10.41;
             }
         }
-        if (axis == 'y')
-        {
-            if (result > -3.16)
-            {
+        if (axis == 'y') {
+            if (result > -3.16) {
                 result = -3.16;
             }
-            if (result < -9.59)
-            {
+            if (result < -9.59) {
                 result = -9.59;
             }
         }
-        if (axis == 'z')
-        {
-            if (result > 5.44)
-            {
+        if (axis == 'z') {
+            if (result > 5.44) {
                 result = 5.44;
             }
-            if (result < 4.36)
-            {
+            if (result < 4.36) {
                 result = 4.36;
             }
         }
         return result;
     }
+
     public void targetShoot(double px, double py, double d, double pos_a, double pos_b, double pos_c)
     {
         double targetShift = 0.2 * Math.sin(Math.toRadians(45));
@@ -359,6 +332,7 @@ public class YourService extends KiboRpcService
 
         moveTo((float) pos_a, (float) pos_b, (float) pos_c, (float) a, (float) b, (float) c, (float) w);
     }
+
     public Mat undistord(Mat src)
     {
         Mat dst = new Mat(1280, 960, CvType.CV_8UC1);
@@ -389,6 +363,7 @@ public class YourService extends KiboRpcService
         Imgproc.undistort(src, dst, cameraMatrix, distCoeffs);
         return dst;
     }
+
     public double[] interceptLine(double p[][])
     {
         double center[] = new double[3];
@@ -413,5 +388,64 @@ public class YourService extends KiboRpcService
         Log.d("AR_center[NEW]:", "" + center[2]);
 
         return center;
+    }
+
+    public Rect qr_detect(Mat src)
+    {
+        Rect crop = new Rect(0,0,1280,960);
+
+        int x_max=0, y_max=0, x_min=960, y_min=1280;
+        boolean state = false;
+
+        Log.e("Rect[status]:", " start");
+        Mat src_convert = new Mat(src.size(), CvType.CV_8UC3);
+        Mat src_blur    = new Mat(src.size(), CvType.CV_8UC3);
+        Mat src_out     = new Mat(src.size(), CvType.CV_8UC3);
+
+
+        Imgproc.cvtColor(src, src_convert, Imgproc.COLOR_GRAY2BGR);
+        Imgproc.cvtColor(src_convert, src_convert, Imgproc.COLOR_BGR2GRAY);
+        Imgproc.GaussianBlur(src_convert, src_blur, new Size(5, 5), 0);
+        Imgproc.adaptiveThreshold(src_blur, src_out, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY, 21, 1);
+
+
+        List<MatOfPoint> contours = new ArrayList<>();
+        Imgproc.findContours(src_out, contours, new Mat(), Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
+        Log.e("Rect[status]:", " stop");
+
+
+        for (int i = 0; i < contours.size(); i++)
+        {
+            if ((Imgproc.contourArea(contours.get(i)) > 500 && Imgproc.contourArea(contours.get(i)) < 8000))
+            {
+                Rect rect = Imgproc.boundingRect(contours.get(i));
+
+                if(Math.abs(rect.height-rect.width) < 5)//&& rect.width > 150 && rect.height > 150)
+                {
+                    Log.d("Rect/"+i+"/", " x: " + rect.x + ", y: " + rect.y + ", width: " + rect.width + ", height: " + rect.height);
+
+                    if(x_max < rect.x+rect.width)  x_max = rect.x+rect.width;
+                    if(y_max < rect.y+rect.height) y_max = rect.y+rect.height;
+                    if(x_min > rect.x)  x_min = rect.x;
+                    if(y_min > rect.y)  y_min = rect.y;
+                    state = true;
+                }
+                else
+                {
+                    Log.d("Rect["+i+"]", " x: " + rect.x + ", y: " + rect.y + ", width: " + rect.width + ", height: " + rect.height);
+                }
+            }
+        }
+        if(state == true)
+        {
+            if(Math.abs(x_max-x_min-y_max+y_min) < 20)
+            {
+                int offset = 5;
+                crop = new Rect(x_min-offset, y_min-offset, x_max-x_min+(2*offset), y_max-y_min+(2*offset));
+            }
+        }
+        Log.d("Rect[]: ",""+x_min+", "+y_min+", "+x_max+", "+y_max);
+
+        return crop;
     }
 }
