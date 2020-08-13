@@ -31,6 +31,7 @@ import gov.nasa.arc.astrobee.Result;
 import gov.nasa.arc.astrobee.types.Point;
 import gov.nasa.arc.astrobee.types.Quaternion;
 import jp.jaxa.iss.kibo.rpc.api.KiboRpcService;
+import jp.jaxa.iss.kibo.rpc.api.types.PointCloud;
 
 import static org.opencv.android.Utils.matToBitmap;
 
@@ -42,9 +43,14 @@ public class YourService extends KiboRpcService
         api.judgeSendStart();
 
         moveTo(10.9263f, -5.2426f, 4.4622f, 0.0f, 0.0f, 0.0f, 0.0f);
+        moveTo(10.7600f, -5.2426f, 4.4622f, 0.0f, 0.0f, 1.0f, 0.0f,0); // p1
 
+
+
+
+        /*
         boolean run = true;
-        Mat src_mat = new Mat(1280,960, CvType.CV_8UC1);
+        Mat src_mat = new Mat(960,1280, CvType.CV_8UC1);
 
         while(run)
         {
@@ -83,9 +89,28 @@ public class YourService extends KiboRpcService
                 count++;
             }
         }
+        */
+
+//        PointCloud point_cloud = api.getPointCloudHazCam();
+//        Point[] point = point_cloud.getPointArray();
+//
+//        double[] y_point = new double[point_cloud.getWidth()*point_cloud.getHeight()];
+//
+//        for(int row=1; row<point_cloud.getHeight()+1; row++)
+//        {
+//            for(int col=0; col<point_cloud.getWidth(); col++)
+//            {
+//                y_point[row*col] = point[row*col].getY();
+//            }
+//        }
 
 
 
+
+
+
+
+        moveTo(10.7600f, -5.2426f, 4.4622f, 0.0f, 0.0f, 0.7071f, -0.7071f);
 
         api.laserControl(true);
         api.judgeSendFinishSimulation();
@@ -106,11 +131,14 @@ public class YourService extends KiboRpcService
     public void moveTo(Point point, Quaternion quaternion)
     {
         Result result;
+        int count=0, max_count=3;
+
         do
-            {
+        {
             result = api.moveTo(point, quaternion, true);
+            count++;
         }
-        while (!result.hasSucceeded());
+        while (!result.hasSucceeded() && count<=max_count);
     }
 
     public void moveTo(float px, float py, float pz, float qx, float qy, float qz, float qw)
@@ -124,63 +152,112 @@ public class YourService extends KiboRpcService
     public double[] moveTo(float px, float py, float pz, float qx, float qy, float qz, float qw, int no)
     {
         String contents = null;
-        int count = 0, count_max = 5;
         Point point = new Point(px, py, pz);
         Quaternion quaternion = new Quaternion(qx, qy, qz, qw);
 
+
+
+        double percent = 40;
+        int max_row = 960;
+        int max_col = 1280;
+        int offset_row = (int)percent/2*max_row/100;
+        int offset_col = (int)percent/2*max_col/100;
+        int rows = max_row-(offset_row*2);
+        int cols = max_col-(offset_col*2);
+
+
+
+        int count = 0, count_max = 8;
         while (contents == null && count < count_max)
         {
             moveTo(point, quaternion);
-            SystemClock.sleep(1000);
-
-            Mat src_mat = api.getMatNavCam();
-            src_mat = undistord(src_mat);
-
-            double scale = 12;
-            int width = 1280, height = 960;
+            SystemClock.sleep(3000);
 
 
-            Rect crop = qr_detect(src_mat);
+//            boolean i=false, j=false, k=false;
+//            Kinematics current;
+//            Point p;
+//            do
+//            {
+//                moveTo(point, quaternion);
+//
+//
+//                current = api.getTrustedRobotKinematics();
+//                p = current.getPosition();
+//                if(p.getX()-px+0.1 < 0.1 && p.getX()-px-0.1 > 0.1){ i=true; }
+//                if(p.getY()-py+0.1 < 0.1 && p.getY()-py-0.1 > 0.1){ j=true; }
+//                if(p.getZ()-pz+0.1 < 0.1 && p.getZ()-pz-0.1 > 0.1){ k=true; }
+//            }
+//            while(i && j && k);
+
+
+
+            Mat src_mat = undistord(api.getMatNavCam());
+            Rect crop = qr_detect(src_mat, 500, 8000, 5, 200);
+
+
+            Rect rect; // = new Rect(offset_col, offset_row, cols, rows);
             if(crop.x != 0 && crop.y != 0 && crop.width != 1280 && crop.height != 960)
             {
+                rect = new Rect(crop.x, crop.y, cols, rows);
+                Log.d("", "NO FIX");
+                ////
+
+                src_mat = new Mat(src_mat, rect);
+                Log.d("QR[crop]:", " " + src_mat.width() + ", " + src_mat.height());
+                Size size = new Size(2000, 1500);
+                Imgproc.resize(src_mat, src_mat, size);
+                Log.d("QR[crop]:", " " + src_mat.width() + ", " + src_mat.height());
+
+
+                /*
                 src_mat = new Mat(src_mat, crop);
+                Log.d("QR[crop]:", " " + src_mat.width() + ", " + src_mat.height());
 
-//                width  = (int)(scale*src_mat.width());
-//                height = (int)(scale*src_mat.height());
-//
-//                Size size = new Size(width, height);
-//                Imgproc.resize(src_mat, src_mat, size);
-            }
+                double scale = 24;
+                int width  = (int)(scale*src_mat.width());
+                int height = (int)(scale*src_mat.height());
 
-            Bitmap bMap = Bitmap.createBitmap(src_mat.width(), src_mat.height(), Bitmap.Config.ARGB_8888);
-            matToBitmap(src_mat, bMap, false);
-            Log.d("QR[crop]:", " " + bMap.getWidth() + ", " + bMap.getHeight());
+                Size size = new Size(width, height);
+                Imgproc.resize(src_mat, src_mat, size);
+                */
+
+                Log.d("QR[crop]:", " " + src_mat.width() + ", " + src_mat.height());
+                Bitmap bMap = Bitmap.createBitmap(src_mat.width(), src_mat.height(), Bitmap.Config.ARGB_8888);
+                matToBitmap(src_mat, bMap, false);
+                Log.d("QR[crop]:", " " + bMap.getWidth() + ", " + bMap.getHeight());
+
+
+                Log.d("QR[" + no + "][status]:", " start");
+
+                int[] intArray = new int[bMap.getWidth() * bMap.getHeight()];
+                bMap.getPixels(intArray, 0, bMap.getWidth(), 0, 0, bMap.getWidth(), bMap.getHeight());
+
+                LuminanceSource source = new RGBLuminanceSource(bMap.getWidth(), bMap.getHeight(), intArray);
+                BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
+
+                try
+                {
+                    com.google.zxing.Result result = new QRCodeReader().decode(bitmap);
+                    contents = result.getText();
+                    Log.d("QR[" + no + "][value]:", " " + contents);
+                }
+                catch (Exception e)
+                {
+                    Log.d("QR" + no + "[status]:", " Not detected");
+                }
 
 
 
-            Log.d("QR[" + no + "][status]:", " start");
-
-            int[] intArray = new int[bMap.getWidth() * bMap.getHeight()];
-            bMap.getPixels(intArray, 0, bMap.getWidth(), 0, 0, bMap.getWidth(), bMap.getHeight());
-
-            LuminanceSource source = new RGBLuminanceSource(bMap.getWidth(), bMap.getHeight(), intArray);
-            BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
-
-            try
-            {
-                com.google.zxing.Result result = new QRCodeReader().decode(bitmap);
-                contents = result.getText();
-                Log.d("QR[" + no + "][value]:", " " + contents);
-            }
-            catch (Exception e)
-            {
-                Log.d("QR" + no + "[status]:", " Not detected");
             }
             Log.d("QR[" + no + "][count]:", " " + count);
             Log.d("QR[" + no + "][status]:", " stop");
 
             count++;
         }
+
+
+
         api.judgeSendDiscoveredQR(no, contents);
 
         String[] multi_contents = contents.split(", ");
@@ -193,7 +270,6 @@ public class YourService extends KiboRpcService
         final double final_z = Double.parseDouble(multi_contents[5]);
 
         final double[] val_return = {final_x, final_y, final_z};
-
         return val_return;
     }
 
@@ -203,7 +279,8 @@ public class YourService extends KiboRpcService
         double result[] = new double[6];
         Point point = new Point();
 
-        while (AR_int == 0) {
+        while (AR_int == 0)
+        {
             Log.d("AR_counter: ", "" + count);
 
             moveTo(px, py, pz, qx, qy, qz, qw);
@@ -215,15 +292,19 @@ public class YourService extends KiboRpcService
             List<Mat> corners = new ArrayList<>();
             DetectorParameters setting = null;
 
-            try {
+            try
+            {
                 Aruco.detectMarkers(source, dictionary, corners, ids);
                 AR_int = (int) ids.get(0, 0)[0];
                 Kinematics current = api.getTrustedRobotKinematics();
                 point = current.getPosition();
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 AR_int = 0;
             }
-            if (AR_int != 0) {
+            if (AR_int != 0)
+            {
                 Log.d("AR[" + count + "]: ", "" + AR_int);
 
                 double[][] AR_corners =
@@ -255,30 +336,38 @@ public class YourService extends KiboRpcService
         return qw;
     }
 
-    public double limit(char axis, double val) {
+    public double limit(char axis, double val)
+    {
         double result = val;
 
         if (axis == 'x') {
-            if (result > 11.49) {
+            if (result > 11.49)
+            {
                 result = 11.49;
             }
-            if (result < 10.41) {
+            if (result < 10.41)
+            {
                 result = 10.41;
             }
         }
         if (axis == 'y') {
-            if (result > -3.16) {
+            if (result > -3.16)
+            {
                 result = -3.16;
             }
-            if (result < -9.59) {
+            if (result < -9.59)
+            {
                 result = -9.59;
             }
         }
-        if (axis == 'z') {
-            if (result > 5.44) {
+        if (axis == 'z')
+        {
+            if (result > 5.44)
+            {
                 result = 5.44;
             }
-            if (result < 4.36) {
+            if (result < 4.36)
+            {
                 result = 4.36;
             }
         }
@@ -390,7 +479,7 @@ public class YourService extends KiboRpcService
         return center;
     }
 
-    public Rect qr_detect(Mat src)
+    public Rect qr_detect(Mat src, int min_contour, int max_contour, int dif_rect, int offset)
     {
         Rect crop = new Rect(0,0,1280,960);
 
@@ -414,15 +503,15 @@ public class YourService extends KiboRpcService
         Log.e("Rect[status]:", " stop");
 
 
-        for (int i = 0; i < contours.size(); i++)
+        for (int no = 0; no < contours.size(); no++)
         {
-            if ((Imgproc.contourArea(contours.get(i)) > 500 && Imgproc.contourArea(contours.get(i)) < 8000))
+            if (Imgproc.contourArea(contours.get(no)) > min_contour && Imgproc.contourArea(contours.get(no)) < max_contour)
             {
-                Rect rect = Imgproc.boundingRect(contours.get(i));
+                Rect rect = Imgproc.boundingRect(contours.get(no));
 
-                if(Math.abs(rect.height-rect.width) < 5)//&& rect.width > 150 && rect.height > 150)
+                if(Math.abs(rect.height-rect.width) < dif_rect)
                 {
-                    Log.d("Rect/"+i+"/", " x: " + rect.x + ", y: " + rect.y + ", width: " + rect.width + ", height: " + rect.height);
+                    Log.d("Rect/"+no+"/", " x: " + rect.x + ", y: " + rect.y + ", width: " + rect.width + ", height: " + rect.height);
 
                     if(x_max < rect.x+rect.width)  x_max = rect.x+rect.width;
                     if(y_max < rect.y+rect.height) y_max = rect.y+rect.height;
@@ -432,19 +521,30 @@ public class YourService extends KiboRpcService
                 }
                 else
                 {
-                    Log.d("Rect["+i+"]", " x: " + rect.x + ", y: " + rect.y + ", width: " + rect.width + ", height: " + rect.height);
+                    Log.d("Rect["+no+"]", " x: " + rect.x + ", y: " + rect.y + ", width: " + rect.width + ", height: " + rect.height);
                 }
             }
         }
-        if(state == true)
+        if(state && Math.abs(x_max-x_min-y_max+y_min) < dif_rect)
         {
-            if(Math.abs(x_max-x_min-y_max+y_min) < 20)
-            {
-                int offset = 5;
-                crop = new Rect(x_min-offset, y_min-offset, x_max-x_min+(2*offset), y_max-y_min+(2*offset));
-            }
+//            crop = new Rect(x_min-offset, y_min-offset, x_max-x_min+(2*offset), y_max-y_min+(2*offset));
+
+
+            int widht  = x_max-x_min;
+            int height = y_max-y_min;
+            int offset_x = (512-widht)/2;
+            int offset_y = (384-height)/2;
+
+//            int offset_y = 0; //(672-height)/2;
+//            int offset_x = (int)((height*4.0/3.0-widht)/2);
+
+
+
+
+            crop = new Rect(x_min-offset_x, y_min-offset_y, widht+(2*offset_x), height+(2*offset_y));
         }
         Log.d("Rect[]: ",""+x_min+", "+y_min+", "+x_max+", "+y_max);
+        Log.d("Rect[]: ",""+crop.x+", "+crop.y+", "+crop.width+", "+crop.height);
 
         return crop;
     }
