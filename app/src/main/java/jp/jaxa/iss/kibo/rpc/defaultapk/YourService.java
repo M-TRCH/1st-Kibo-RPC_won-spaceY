@@ -42,8 +42,13 @@ public class YourService extends KiboRpcService
     {
         api.judgeSendStart();
 
-        moveTo(10.9263f, -5.2426f, 4.4622f, 0.0f, 0.0f, 0.0f, 0.0f);
-        moveTo(10.7600f, -5.2426f, 4.4622f, 0.0f, 0.0f, 1.0f, 0.0f,0); // p1
+        float z_shift = 0.0f;
+
+
+        moveTo(10.76f, -5.16f, 4.52f+z_shift, 10.70f, -5.16f, 4.42f+z_shift, 0);
+
+        //moveTo(10.9263f, -5.2426f, 4.4622f, 0.0f, 0.0f, 0.0f, 0.0f);
+        //moveTo(10.7600f, -5.2426f, 4.4622f, 0.0f, 0.0f, 1.0f, 0.0f,0); // p1
 
 
 
@@ -110,7 +115,7 @@ public class YourService extends KiboRpcService
 
 
 
-        moveTo(10.7600f, -5.2426f, 4.4622f, 0.0f, 0.0f, 0.7071f, -0.7071f);
+//        moveTo(10.7600f, -5.2426f, 4.4622f, 0.0f, 0.0f, 0.7071f, -0.7071f);
 
         api.laserControl(true);
         api.judgeSendFinishSimulation();
@@ -166,13 +171,23 @@ public class YourService extends KiboRpcService
         int cols = max_col-(offset_col*2);
 
 
+        Mat[] src_ = new Mat[5];
 
-        int count = 0, count_max = 8;
-        while (contents == null && count < count_max)
+        int count_out = 0, maxCount_out = 6;
+
+        do
         {
             moveTo(point, quaternion);
-            SystemClock.sleep(3000);
 
+
+            Log.d("Capture[]:", " start");
+            src_[0] = undistord(api.getMatNavCam());
+            src_[1] = undistord(api.getMatNavCam());
+            Log.d("Capture[]:", " stop");
+
+            int count = 0, count_max = 2;
+            while (contents == null && count < count_max)
+            {
 
 //            boolean i=false, j=false, k=false;
 //            Kinematics current;
@@ -190,18 +205,18 @@ public class YourService extends KiboRpcService
 //            }
 //            while(i && j && k);
 
+                Mat src_mat = src_[count];
+
+                Rect crop = qr_detect(src_mat, 500, 8000, 5, 200);
 
 
-            Mat src_mat = undistord(api.getMatNavCam());
-            Rect crop = qr_detect(src_mat, 500, 8000, 5, 200);
-
-
-            Rect rect; // = new Rect(offset_col, offset_row, cols, rows);
-            if(crop.x != 0 && crop.y != 0 && crop.width != 1280 && crop.height != 960)
-            {
-                rect = new Rect(crop.x, crop.y, cols, rows);
-                Log.d("", "NO FIX");
-                ////
+                Rect rect = new Rect(offset_col, offset_row, cols, rows);
+                if (crop.x != 0 && crop.y != 0 && crop.width != 1280 && crop.height != 960)
+                {
+                    rect = new Rect(crop.x, crop.y, cols, rows);
+                    Log.d("", "NO FIX");
+                    ////
+                }
 
                 src_mat = new Mat(src_mat, rect);
                 Log.d("QR[crop]:", " " + src_mat.width() + ", " + src_mat.height());
@@ -236,25 +251,22 @@ public class YourService extends KiboRpcService
                 LuminanceSource source = new RGBLuminanceSource(bMap.getWidth(), bMap.getHeight(), intArray);
                 BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
 
-                try
-                {
+                try {
                     com.google.zxing.Result result = new QRCodeReader().decode(bitmap);
                     contents = result.getText();
                     Log.d("QR[" + no + "][value]:", " " + contents);
-                }
-                catch (Exception e)
-                {
+                } catch (Exception e) {
                     Log.d("QR" + no + "[status]:", " Not detected");
                 }
 
 
+                Log.d("QR[" + no + "][count]:", " " + count);
+                Log.d("QR[" + no + "][status]:", " stop");
 
+                count++;
             }
-            Log.d("QR[" + no + "][count]:", " " + count);
-            Log.d("QR[" + no + "][status]:", " stop");
-
-            count++;
         }
+        while ((contents == null && count_out < maxCount_out));
 
 
 
@@ -547,5 +559,125 @@ public class YourService extends KiboRpcService
         Log.d("Rect[]: ",""+crop.x+", "+crop.y+", "+crop.width+", "+crop.height);
 
         return crop;
+    }
+
+    public void moveTo(float x_org, float y_org, float z_org, float x_des, float y_des, float z_des)
+    {
+        double navShift_z = 0.0826;
+        double navShift_y = 0.0422;
+
+        double dx = x_des-x_org;
+        double dy = y_des-y_org;
+        double dz = z_des-z_org;
+
+        double magnitude = Math.sqrt((dx*dx)+(dy*dy)+(dz*dz));
+        double x_unit = dx/magnitude;
+        double y_unit = dy/magnitude;
+        double z_unit = dz/magnitude;
+
+        double matrix[][] =
+                {
+                        {1, 0, 0},
+                        {x_unit, y_unit, z_unit}
+                };
+
+        double x = matrix[0][1]*matrix[1][2] - matrix[1][1]*matrix[0][2];
+        double y = matrix[0][2]*matrix[1][0] - matrix[1][2]*matrix[0][0];
+        double z = matrix[0][0]*matrix[1][1] - matrix[1][0]*matrix[0][1];
+
+        double i = matrix[1][0]-matrix[0][0];
+        double j = matrix[1][1]-matrix[0][1];
+        double k = matrix[1][2]-matrix[0][2];
+
+        double q = Math.sqrt(x*x + y*y + z*z);
+        double p = Math.sqrt(i*i + j*j + k*k);
+        double r = Math.sqrt(matrix[0][0]*matrix[0][0]
+                            +matrix[0][1]*matrix[0][1]
+                            +matrix[0][2]*matrix[0][2]);
+
+        double theta = Math.acos((r*r + q*q - p*p) / (2*q*r));
+
+        double a = Math.sin(theta/2)*x/q;
+        double b = Math.sin(theta/2)*y/q;
+        double c = Math.sin(theta/2)*z/q;
+        double w = Math.cos(theta/2);
+
+        moveTo(x_org, y_org+(float)navShift_y, z_org, (float)a, (float)b, (float)c, (float)w);
+    }
+    public double[] moveTo(float x_org, float y_org, float z_org, float x_des, float y_des, float z_des, int no)
+    {
+        String contents = null;
+
+        double percent = 40;
+        int max_row = 960;
+        int max_col = 1280;
+        int offset_row = (int)percent/2*max_col/100;
+        int offset_col = (int)percent/2*max_col/100;
+        int rows = max_row-(offset_row*2);
+        int cols = max_col-(offset_col*2);
+        Rect crop = new Rect(offset_col, offset_row, cols, rows);
+
+
+
+        int count = 0, count_max = 4;
+
+
+        while (contents == null && count < count_max)
+        {
+            moveTo( x_org,  y_org,  z_org,  x_des,  y_des, z_des);
+            Log.d("Capture[]:", " start");
+            Mat src_mat = api.getMatNavCam();
+            Log.d("Capture[]:", " stop");
+
+
+            src_mat = new Mat(src_mat, crop);
+            Size size = new Size(2000, 1500);
+            Imgproc.resize(src_mat, src_mat, size);
+
+
+            Log.d("QR[crop]:", " " + src_mat.width() + ", " + src_mat.height());
+            Bitmap bMap = Bitmap.createBitmap(src_mat.width(), src_mat.height(), Bitmap.Config.ARGB_8888);
+            matToBitmap(src_mat, bMap, false);
+            Log.d("QR[crop]:", " " + bMap.getWidth() + ", " + bMap.getHeight());
+
+
+            Log.d("QR[" + no + "][status]:", " start");
+
+            int[] intArray = new int[bMap.getWidth() * bMap.getHeight()];
+            bMap.getPixels(intArray, 0, bMap.getWidth(), 0, 0, bMap.getWidth(), bMap.getHeight());
+
+            LuminanceSource source = new RGBLuminanceSource(bMap.getWidth(), bMap.getHeight(), intArray);
+            BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
+
+            try
+            {
+                com.google.zxing.Result result = new QRCodeReader().decode(bitmap);
+                contents = result.getText();
+                Log.d("QR[" + no + "][value]:", " " + contents);
+            }
+            catch (Exception e)
+            {
+                Log.d("QR" + no + "[status]:", " Not detected");
+            }
+
+            Log.d("QR[" + no + "][count]:", " " + count);
+            Log.d("QR[" + no + "][status]:", " stop");
+
+            count++;
+        }
+
+        api.judgeSendDiscoveredQR(no, contents);
+
+        String[] multi_contents = contents.split(", ");
+        Log.d("QR[" + no + "][x]:", " " + multi_contents[1]);
+        Log.d("QR[" + no + "][y]:", " " + multi_contents[3]);
+        Log.d("QR[" + no + "][z]:", " " + multi_contents[5]);
+
+        final double final_x = Double.parseDouble(multi_contents[1]);
+        final double final_y = Double.parseDouble(multi_contents[3]);
+        final double final_z = Double.parseDouble(multi_contents[5]);
+
+        final double[] val_return = {final_x, final_y, final_z};
+        return val_return;
     }
 }
