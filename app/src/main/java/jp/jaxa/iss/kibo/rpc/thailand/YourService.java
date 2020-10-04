@@ -33,7 +33,7 @@ import java.util.List;
 
 public class YourService extends KiboRpcService
 {
-    String MODE = "sim"; // mode setting ("sim" or "iss")
+    String MODE = "iss"; // mode setting ("sim" or "iss")
     int NAV_MAX_COL = 1280;
     int NAV_MAX_ROW =  960;
     int PointCloud_COL = 224;
@@ -51,15 +51,17 @@ public class YourService extends KiboRpcService
         api.judgeSendStart();
 
 
-        final double[] P3_pos = QR_event(10.7600f, -5.2426f, 4.4622f, 0.0f, 0.0f, 1.0f, 0.0f, max_count, P1);
-        moveTo(10.7600f, -5.7100f, 4.9100f, 0.0f, 0.0f, 0.0f, 0.0f);
-        moveTo(10.4600f, -6.0800f, 5.2400f, 0.0f, 0.0f, 0.0f, 0.0f);
-        moveTo(10.4600f, -7.6800f, 5.2400f, 0.0f, 0.0f, 0.0f, 0.0f);
-        final double[] P3_qua = QR_event(10.9774f, -7.6378f, 5.4000f, 0.0f, -0.7071f, 0.0f, 0.7071f, max_count, P2);
+        final double[] P3_pos = QR_event(10.7600f, -5.6122f, 4.5826f, 0.0f, 0.0f, 1.0f, 0.0f, max_count, P1);
+        moveTo(10.7000f, -6.0300f, 5.0000f, 0.0f, 0.0f, 0.0f, 0.0f);
+        moveTo(10.4600f, -6.2800f, 5.2400f, 0.0f, 0.0f, 0.0f, 0.0f);
+        moveTo(10.4600f, -6.7800f, 5.2400f, 0.0f, 0.0f, 0.0f, 0.0f);
+        final double[] P3_qua = QR_event(11.0174f, -7.9378f, 5.4100f, 0.0f, -0.7071f, 0.0f, 0.7071f, max_count, P2);
         // QR part
 
-        moveTo(10.8000f, -8.5000f, 5.1500f, 0.0f, 0.0f, 0.7071f, -0.7071f);
-        double[] AR_pos = AR_event(10.9500f, -9.5900f, 5.4100f, 0.0f, 0.0f, 0.7071f, -0.7071f, max_count, true);
+        moveTo(11.4600f, -8.6000f, 4.8000f, 0.0f, 0.0f, 0.7071f, -0.7071f);
+        //double[] AR_pos = AR_event((float) P3_pos[0], (float) P3_pos[1], (float) P3_pos[2], (float) P3_qua[0], (float) P3_qua[1], (float) P3_qua[2], (float) P3_qua[3], max_count, true);
+        //double[] AR_pos = AR_event(10.9500f, -9.5900f, 5.4000f, 0.0f, 0.0f, 0.7071f, -0.7071f, max_count, true);
+        double[] AR_pos = AR_event(10.9250f, -10.0400f, 5.4000f, 0.0f, 0.0f, 0.7071f, -0.7071f, max_count, true);
         // AR part
 
         AR_pos = AR_event((float) AR_pos[0], -9.5900f, (float) AR_pos[2],0.0f, 0.0f, 0.7071f, -0.7071f, max_count, false);
@@ -141,20 +143,33 @@ public class YourService extends KiboRpcService
         int row = 0, col = 0;
 
         double cameraMatrix_sim[] =
-                {
-                        344.173397, 0.000000, 630.793795,
-                        0.000000, 344.277922, 487.033834,
-                        0.000000, 0.000000, 1.000000
-                };
+        {
+                344.173397, 0.000000, 630.793795,
+                0.000000, 344.277922, 487.033834,
+                0.000000, 0.000000, 1.000000
+        };
         double distCoeffs_sim[] = {-0.152963, 0.017530, -0.001107, -0.000210, 0.000000};
 
         double cameraMatrix_orbit[] =
-                {
-                        692.827528, 0.000000, 571.399891,
-                        0.000000, 691.919547, 504.956891,
-                        0.000000, 0.000000, 1.000000
-                };
+        {
+                692.827528, 0.000000, 571.399891,
+                0.000000, 691.919547, 504.956891,
+                0.000000, 0.000000, 1.000000
+        };
         double distCoeffs_orbit[] = {-0.312191, 0.073843, -0.000918, 0.001890, 0.000000};
+
+        if(MODE == "sim")
+        {
+            cameraMatrix.put(row, col, cameraMatrix_sim);
+            distCoeffs.put(row, col, distCoeffs_sim);
+            Log.d("Mode[camera]:"," sim");
+        }
+        else if(MODE == "iss")
+        {
+            cameraMatrix.put(row, col, cameraMatrix_orbit);
+            distCoeffs.put(row, col, distCoeffs_orbit);
+            Log.d("Mode[camera]:"," iss");
+        }
 
         cameraMatrix.put(row, col, cameraMatrix_orbit);
         distCoeffs.put(row, col, distCoeffs_orbit);
@@ -260,8 +275,16 @@ public class YourService extends KiboRpcService
     {
         api.laserControl(laser_control);
 
-        if(MODE == "sim") api.judgeSendFinishSimulation();
-        else if(MODE == "iss") api.judgeSendFinishISS();
+        if(MODE == "sim")
+        {
+            Log.d("Mode[judge]:"," sim");
+            api.judgeSendFinishSimulation();
+        }
+        else if(MODE == "iss")
+        {
+            Log.d("Mode[judge]:"," iss");
+            api.judgeSendFinishISS();
+        }
     }
     public double[] QR_event(float px, float py, float pz, float qx, float qy, float qz, float qw, int count_max, int no)
     {
@@ -338,7 +361,7 @@ public class YourService extends KiboRpcService
 
             //////////////////////////////////////////////////////////////////////////////////////////////////////
             Mat source = undistord(api.getMatNavCam());
-            Kinematics robot = api.getTrustedRobotKinematics();
+            Kinematics robot = api.getTrustedRobotKinematics(5);
             Mat ids = new Mat();
             Dictionary dictionary = Aruco.getPredefinedDictionary(Aruco.DICT_5X5_250);
             List<Mat> corners = new ArrayList<>();
@@ -362,7 +385,12 @@ public class YourService extends KiboRpcService
                 double[] AR_info = Intersection(AR_corners);
 
 
-                Point point = robot.getPosition();
+                Point point = new Point(px, py, pz);
+                if(robot != null)
+                {
+                    point = robot.getPosition();
+                    Log.d("getKinematics[status]:"," Finished");
+                }
                 result[0] = point.getX() + (AR_info[0]- NAV_MAX_COL/2) / AR_info[2];
                 result[1] = point.getY();
                 result[2] = point.getZ() + (AR_info[1]- NAV_MAX_ROW/2) / AR_info[2];
@@ -384,3 +412,5 @@ public class YourService extends KiboRpcService
         return result;
     }
 }
+
+
