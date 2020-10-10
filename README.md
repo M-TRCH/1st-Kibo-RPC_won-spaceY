@@ -1,4 +1,4 @@
-# Kibo-Robot-2020 by won-spaceY Team
+Kibo-RPC-2020 by won-spaceY Team
 Save ISS with Astrobee!!!
 
 Event Information
@@ -18,3 +18,8 @@ Engineering teaches us that a simulation can only approximate the real world. Th
 in the real world despite uncertainties and within margins of error.
 Students will learn the necessity of controlling and correcting positions and orientation of a
 free-flying robot and how to perform assigned tasks in the onboard environment through simulation trials.
+
+
+Detail path
+
+1.Source code : Kibo-RPC-2020/app/src/main/java/jp/jaxa/iss/kibo/rpc/thailand/YourService.java
