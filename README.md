@@ -22,4 +22,4 @@ free-flying robot and how to perform assigned tasks in the onboard environment t
 
 Detail path
 
-1.Source code : Kibo-RPC-2020/app/src/main/java/jp/jaxa/iss/kibo/rpc/thailand/YourService.java
+1.Source code : 1st-Kibo-RPC_won-spaceY/app/src/main/java/jp/jaxa/iss/kibo/rpc/thailand/YourService.java
